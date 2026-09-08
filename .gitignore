@@ -1,0 +1,23 @@
+# credentials
+.env
+.env.*
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Program on Negotiation material and everything derived from it (README, "Rights")
+cases/
+runs/
+
+# regenerable knowledge-base artefacts: downloaded papers, extracted text, cache, built database
+knowledge/papers/
+knowledge/extracted/
+knowledge/db/papers.sqlite
+knowledge/db/resolve_cache.json
+
+# os / editors
+.DS_Store
+.streamlit/
