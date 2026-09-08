@@ -1,0 +1,46 @@
+# Manual resolution hints (task 1.2).
+#
+# The reference list of the Kosmos report is cut off at [12.3]; groups [13.1]–[23.1] exist
+# only as mentions in the body (author + year). For those mentions, a hint is a *candidate
+# title* proposed by the annotator from what the report itself says about the work. The hint
+# is NOT the resolution: the resolver uses it as a query and only accepts it if OpenAlex/
+# Crossref confirm the author and a title overlap (>= 0.25). A wrong hint resolves nothing:
+# the reference stays `ambiguous`.
+#
+# Format:  "<mention_string in lower case>": {title: <candidate title>, note: <justification>}
+
+"cui and lin 2025":
+  title: "Distilling Bayesian Belief States into Language Models for Auditable Negotiation"
+  note: "The body calls it 'Cui and Lin 2025'; the formal entry [7.x] dates it as ArXiv (2605). Same work, inconsistent year in the source."
+
+"hindriks and tykhonov 2008":
+  title: "Opponent modelling in automated multi-issue negotiation using Bayesian learning"
+  note: "The report attributes to it the dispersion parameter sigma that controls the aggressiveness of the posterior update (L1, section 4)."
+
+"wolpert and tumer 2002":
+  title: "Optimal payoff functions for members of collectives"
+  note: "The report cites it as the origin of difference rewards (L3, section 1)."
+
+"foerster et al. 2018":
+  title: "Counterfactual Multi-Agent Policy Gradients"
+  note: "The report names it as COMA, a centralised critic that marginalises one agent's action (L3, section 1)."
+
+"li et al. 2021":
+  title: "Shapley Counterfactual Credits for Multi-Agent Reinforcement Learning"
+  note: "The report explicitly names 'Shapley Counterfactual Credits' when describing this work (L3, sections 1 and 2)."
+
+"krogh and vedelsby 1995":
+  title: "Neural network ensembles, cross validation, and active learning"
+  note: "The report cites it as the ambiguity decomposition: ensemble error = mean individual error - ambiguity (L3, section 3)."
+
+"wolpert 1992":
+  title: "Stacked generalization"
+  note: "The report cites it together with Breiman 1996 as the origin of stacking (L3, section 1)."
+
+"breiman 1996":
+  title: "Stacked regressions"
+  note: "Cited together with Wolpert 1992 as the origin of stacking (L3, section 1)."
+
+"tsang et al. 2024":
+  title: "An adaptive weight ensemble approach to forecast influenza activity"
+  note: "The report describes it as the Adaptive Weight Blending Ensemble (AWBE) for influenza in Hong Kong (L3, section 5)."
