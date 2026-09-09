@@ -1,0 +1,48 @@
+# Personality `econ` (§7.2). The only personality in E1.
+#
+# tau and lambda are sweep parameters, not constants: Part 3 sweeps them to trace the
+# utility–impasse frontier. The values here are the starting point.
+
+personality_id: econ
+description: >-
+  Maximises its own utility subject to Pareto efficiency. Does not yield to fairness norms, but
+  does look for joint gains when they exist. Risk-neutral in utility, optimistic in its belief
+  about the counterpart.
+
+objective: maximize_own_utility
+efficiency_seeking: true
+fairness_norm: none
+risk_attitude: neutral
+
+# --- Optimism under uncertainty (RQ2, lever 2) ---------------------------------------------
+# Decisions are taken on a quantile of the posterior over the counterpart's rv, not on its mean.
+# DIRECTION, which is easy to invert: `rv` is the *counterpart's* reservation utility. A low rv
+# means it accepts offers that are worse for it, i.e. better for us. That is why
+# "optimism tau = 0.75" is implemented as the 1−tau = 0.25 quantile of rv: the favourable scenario.
+optimism_quantile_tau: 0.75
+
+# --- Offers as experiments (RQ2, lever 1) ---------------------------------------------------
+# Weight of the expected information gain in the score of a candidate offer.
+info_gain_weight_lambda: 0.25
+
+# --- Decision rules --------------------------------------------------------------------------
+acceptance_rule: accept_if_u_offer_ge_expected_value_of_continuing
+walk_away_rule: rv_plus_margin
+walk_away_margin: 0.02          # in own-utility units
+concession_policy: planned_by_blocks
+probe_policy: meso_when_disagreement
+disagreement_threshold_sd: 1.0  # fox disagreement that triggers a hypothesis and a probe
+
+# Concession blocks: fraction of the way between aspiration and reservation value the agent is
+# willing to travel by the end of each block of rounds.
+concession_blocks:
+  - {until_fraction_of_deadline: 0.35, concede_to: 0.10}
+  - {until_fraction_of_deadline: 0.70, concede_to: 0.35}
+  - {until_fraction_of_deadline: 0.90, concede_to: 0.70}
+  - {until_fraction_of_deadline: 1.00, concede_to: 1.00}
+
+# Declared budgets. NOT enforced yet (REVIEW.md, F10): only the researchers' wall-clock budget is.
+budgets:
+  preparation_input_tokens: 250000
+  negotiation_input_tokens_per_round: 40000
+  researcher_input_tokens_per_task: 60000
