@@ -1,0 +1,353 @@
+# Fox catalog (task 1.7).
+#
+# A fox is a calibrated microtheory that estimates a part of θ, the acceptance probability or
+# the distribution of outcomes. Statuses:
+#   candidate   = documented, NOT implemented, NOT usable in a program
+#   implemented = code + minimal test, no validation report: usable only as experimental
+#   validated   = recovers a known θ on the synthetic dataset with reported interval coverage
+#
+# `scope_conditions` is normative: the planner picks foxes by reading it, and every output
+# outside scope is flagged out_of_scope and does not enter the pool (protocol §6.5, rules 1 and 10).
+#
+# Promotion rule to `validated` (fixed in catalog/rubric.md and applied here):
+#   (a) coverage of the 90 % interval between 0.80 and 0.97 on the validation split, and
+#   (b) beats the control f06 on at least one proper scoring rule (CRPS or log score), with the
+#       deficit on the other declared explicitly in `validation_summary`.
+# Calibration and validation use disjoint partitions of the synthetic dataset (hash of episode_id).
+#
+# Lineage, not reproduction (REVIEW.md, F12): every fox implements the mechanism that the cited
+# paper describes, as reconstructed from the survey and the extracted text, with our own
+# discretisation and our own calibration. No fox reproduces a published number.
+
+version: 1
+generated_by: "task 1.7 over catalog/rubric.md and catalog/paper_annotations.yaml"
+
+foxes:
+  - fox_id: f01_bayes_rv_concession
+    name: "Bayesian learning of the reservation value from the concession sequence"
+    version: "0.1.0"
+    status: validated
+    validation_summary: >-
+      Over 934 in-scope evaluations: CRPS 0.122 (control 0.121, tie), log score 0.128
+      (control -0.002, better), coverage 50/90 = 0.43/0.93. Beats the control on both rules
+      against `conceder` counterparts (CRPS 0.073, log score 0.482) and `tit_for_tat`
+      (0.101, 0.284); against `boulware` and `linear` it is indistinguishable from the control
+      within a 24-round horizon, which is the result the literature anticipates (the posterior
+      does not concentrate against strategies that hold back concession until the end).
+    paper_ids: [zeng1998baye, baarslag2015lear]
+    rubric_score: 21
+    estimates: [theta.rv]
+    phase: online
+    inputs_required:
+      - "the counterpart's offers per round, evaluated with *its* utility as estimated by the party"
+      - "prior over rv (uniform over the issue range by default)"
+    outputs: "Posterior over rv (weighted samples over a grid of hypotheses)"
+    scope_conditions:
+      - "the counterpart concedes with a trend: mean of the first third of its offers at least
+         0.03 above the mean of the last third (checked, not assumed)"
+      - "at least 2 observed offers"
+      - "the counterpart's rv does not change within the session"
+      - "contribution measured only against counterparts that concede steadily; against
+         Boulware within <= 24 rounds its output does not beat the control"
+    assumptions:
+      - "stationarity of rv within the session"
+      - "likelihood: the counterpart does not offer below its rv and concedes towards it"
+      - "the hypothesis grid contains the true value"
+    calibration_dataset: data/synthetic/episodes.parquet
+    validation_report: foxes/f01_bayes_rv_concession/validation_report.md
+    skill_path: skills/foxes/f01_bayes_rv_concession
+    implementation_plan: "Hypothesis grid over rv; logistic likelihood on the margin
+      (offer − rv); sequential Bayesian update per round; posterior = normalised weights."
+    known_bias: >-
+      In the Parker-Gibson reference program f01 bounds rv from below by the lowest observed
+      offer, and a counterpart that never concedes below its target leaves that bound high:
+      the pooled belief overestimates the counterpart's rv (DECISIONS D-035) and the
+      leave-one-out attribution of f01 is negative in that program (D-045, D-047).
+
+  - fox_id: f02_concession_issue_weights
+    name: "Issue weights from the normalised concession ratio"
+    version: "0.1.0"
+    status: validated
+    validation_summary: >-
+      Over 1734 in-scope evaluations: CRPS 0.092 (flat-Dirichlet control 0.105, better),
+      log score 0.330 (control 0.421, **worse**), coverage 50/90 = 0.54/0.91.
+      The log-score deficit has an identified cause: in the synthetic dataset the true weights
+      are sampled from Dirichlet(1), so the control *is* the generating distribution and is
+      optimal in log score by construction. Beating it in CRPS means f02 moves mass towards
+      the truth; not beating it in log score means it does not yet concentrate enough to beat
+      the correct prior.
+    calibration:
+      parameter: concentration
+      value_file: skills/foxes/f02_concession_issue_weights/assets/calibration.json
+      note: >-
+        The concentration of the output Dirichlet was calibrated for nominal coverage. Without
+        that step the fox was clearly overconfident (90 % coverage = 0.63).
+    paper_ids: [baarslag2015lear]
+    rubric_score: 20
+    estimates: [theta.w]
+    phase: online
+    inputs_required: ["≥ 3 consecutive offers from the counterpart", "range of each issue"]
+    outputs: "Posterior over the weight vector (Dirichlet fitted by bootstrap)"
+    scope_conditions:
+      - "multi-issue (≥ 2 issues)"
+      - "≥ 3 observed offers from the counterpart"
+      - "additive utility of the counterpart"
+    assumptions:
+      - "concession happens first on the least important issues: w_i ≈ 1 − c_i normalised"
+      - "the preference direction per issue is known or inferable from the case itself"
+    calibration_dataset: data/synthetic/episodes.parquet
+    validation_report: foxes/f02_concession_issue_weights/validation_report.md
+    skill_path: skills/foxes/f02_concession_issue_weights
+    implementation_plan: "Concession ratio per issue between consecutive offers, normalised;
+      uncertainty by bootstrap over the observed offer pairs."
+
+  - fox_id: f03_time_concession_regression
+    name: "Regression of the time-dependent tactic (beta and deadline)"
+    version: "0.2.0"
+    status: validated
+    validated_for: [theta.beta]
+    validation_summary: >-
+      Over 352 in-scope evaluations. `beta` (concession shape): CRPS 0.342 vs 1.072 for the
+      control and log score -0.818 vs -1.791; coverage 50/90 = 0.66/0.80 (somewhat
+      overconfident in the tail). `rv`: ties the control (CRPS 0.124 vs 0.121) with a better
+      log score. `T` (deadline): **does not beat the control** (CRPS 4.148 vs 3.961). It is
+      exactly the identifiability warning of the survey (§5.2): rv and T are coupled and the
+      deadline is not recovered from the offer curve. That is why the fox is validated only
+      for `beta`; its `rv` and `T` outputs are reported but must not enter the pool as if they
+      were validated estimates.
+    version_note: >-
+      0.2.0 replaces the residual bootstrap with a grid posterior over (rv, e, T) with a
+      Gaussian likelihood. The bootstrap gave coverage 0.12/0.36: it fitted the curve well but
+      did not represent the ridge of (rv, T) combinations that explain it almost equally.
+    validation_caveat: >-
+      The validation is *in-family* (REVIEW.md, F11): the synthetic counterparts follow the
+      same Faratin–Sierra–Jennings curve that the fox fits. The numbers above show that the
+      estimator recovers the parameters of its own model, not that real counterparts follow it;
+      the scope check (goodness of fit of the curve) is what protects a program from a
+      counterpart that does not.
+    calibration:
+      parameter: noise
+      value_file: skills/foxes/f03_time_concession_regression/assets/calibration.json
+      note: "Standard deviation of the observation noise, calibrated for nominal coverage of `beta`."
+    paper_ids: [faratin1998nego, baarslag2015lear]
+    rubric_score: 20
+    estimates: [theta.beta, theta.T, theta.rv]
+    phase: online
+    inputs_required: ["series of target utilities implied by the counterpart's offers", "current round"]
+    outputs: "Joint posterior over (beta, T, rv) from a grid posterior with Gaussian likelihood"
+    scope_conditions:
+      - "counterpart with a time-dependent tactic (not behaviour-dependent)"
+      - "≥ 4 observed offers"
+      - "identifiability warning: rv and T are coupled; with few rounds the joint posterior is
+         wide even when the point fit looks good"
+    assumptions:
+      - "u(t) = Pmin + (Pmax − Pmin)·(1 − F(t)), F(t) = k + (1 − k)·t^(1/e)"
+      - "the parameters do not change mid-session"
+    calibration_dataset: data/synthetic/episodes.parquet
+    validation_report: foxes/f03_time_concession_regression/validation_report.md
+    skill_path: skills/foxes/f03_time_concession_regression
+    implementation_plan: "Grid posterior over (rv, e, T) with Gaussian likelihood on the
+      concession curve; the correlation between rv and T is reported explicitly."
+
+  - fox_id: f04_accept_boundary_kde
+    name: "Non-parametric acceptance boundary by density estimation"
+    version: "0.1.0"
+    status: implemented
+    validation_summary: >-
+      **Does not reach `validated`.** Two findings, both negative and both informative:
+      (1) none of the 3969 out-of-sample predictions meets the scope condition — it needs
+      >= 4 responses *with variation*, and in this protocol the counterpart rejects the first
+      four offers almost always, so the boundary is not identified within the session;
+      (2) operating out of scope, Brier 0.049 against 0.043 for climatology (skill -0.14):
+      with a 4.5 % base acceptance rate, predicting the base rate beats estimating the
+      boundary from the data of a single session.
+      The population prior calibrated on the calibration split reduced the Brier from 0.075 to
+      0.049 and fixed the over-prediction bias, but not enough to beat climatology.
+    next_version_plan: >-
+      v0.2 should derive p_accept from the pool's posterior over (rv, beta, T) —
+      P(u_cp(offer) >= target_cp(t)) — instead of estimating its own boundary from the few
+      data points of the session. It is the same quantity, estimated where there is
+      information. Implemented as a tool (DECISIONS D-026).
+    wiring_note: >-
+      Until the architecture review (REVIEW.md, F5) no fox in a program ever received a
+      response: the negotiator only fed proposals. It now emits the implied `reject` of its
+      own previous offer and the counterpart's `accept`, so f04 sees responses through
+      `update()`; the scope condition above still holds and it stays experimental.
+    calibration:
+      parameter: log_prior
+      value_file: skills/foxes/f04_accept_boundary_kde/assets/prior.json
+    paper_ids: [baarslag2015lear]
+    rubric_score: 19
+    estimates: [p_accept]
+    phase: online
+    inputs_required: ["≥ 4 observed responses (proposed offer → accepted/rejected)", "estimated utility of the counterpart"]
+    outputs: "ProbEstimate with a credible interval over p_accept for a given offer"
+    scope_conditions:
+      - "≥ 4 observed responses"
+      - "the protocol allows observing explicit rejections"
+    assumptions:
+      - "the acceptance probability is monotone in the utility the offer gives the counterpart"
+      - "the boundary does not move within the session except under time pressure"
+    calibration_dataset: data/synthetic/moves.parquet
+    validation_report: foxes/f04_accept_boundary_kde/validation_report.md
+    skill_path: skills/foxes/f04_accept_boundary_kde
+    implementation_plan: "Bayesian logistic regression on offered utility and time, with KDE
+      smoothing of the observations; intervals by sampling the posterior."
+
+  - fox_id: f05_case_reader_prior
+    name: "Prior over θ elicited from the party's corpus with an LLM"
+    version: "0.0.0"
+    status: candidate
+    paper_ids: [konishi2026pref, lin2026dist]
+    rubric_score: 12
+    estimates: [theta.rv, theta.w, ranking of interests]
+    phase: prep
+    inputs_required: ["the party's confidential corpus", "the case's public corpus", "LLM credentials"]
+    outputs: "Prior posterior over θ in the common format"
+    scope_conditions: ["closed corpus, no browsing", "requires API credentials"]
+    assumptions: ["the corpus contains enough signal about the counterpart"]
+    calibration_dataset: null
+    validation_report: null
+    skill_path: skills/foxes/f05_case_reader_prior
+    blocked_by: "no validation benchmark wired yet; credentials now exist (DECISIONS D-007, D-025)"
+    validation_plan: >-
+      Contrast the elicited prior against the prior assessed by the human expert in the
+      Elmtree case (Raiffa, Figure 1: quartiles 250k/475k over the buyer's RV). It is the only
+      human benchmark available in the repository.
+
+  - fox_id: f06_uninformed_prior
+    name: "Uninformed prior (control)"
+    version: "0.1.1"
+    status: validated
+    validation_summary: >-
+      Nominal coverage verified on the validation split for rv, beta and T. It is the
+      reference the others are measured against; its report exists so that it can be stated
+      that the declared support contains θ.
+    version_note: >-
+      0.1.1 keys the sampler on (seed, round, number of observations) so that two calls on the
+      same state return the same posterior (REVIEW.md, F6). 0.1.0 drew fresh samples on every
+      call, which made the control — and therefore every comparison against it — depend on
+      the order of calls.
+    paper_ids: []
+    rubric_score: 20
+    estimates: [theta.rv, theta.w, theta.beta, theta.T]
+    phase: both
+    inputs_required: ["declared ranges of each issue in case.yaml"]
+    outputs: "Uniform posterior over the declared support"
+    scope_conditions: ["always applicable"]
+    assumptions: ["none beyond the support"]
+    calibration_dataset: null
+    validation_report: foxes/f06_uninformed_prior/validation_report.md
+    skill_path: skills/foxes/f06_uninformed_prior
+    notes: >-
+      Runs always, in every program and for every parameter. It is never a member of the
+      pool: it is the baseline the pool's log score is measured against (REVIEW.md, F7).
+
+  - fox_id: f07_zopa_pareto_estimator
+    name: "ZOPA, Pareto frontier and Nash point by Monte Carlo propagation"
+    version: "0.1.0"
+    status: validated
+    validation_summary: >-
+      Validated as a propagator, not as an estimator of θ. (a) Correctness: with exact θ the
+      mean absolute error over the true ZOPA is 0.0019 (maximum 0.0163, attributable to the
+      sampling of the outcome space). (b) Propagation: fed a noisy belief centred on the truth,
+      it covers the true value above nominal (0.93-1.00 at 90 %), i.e. it does not
+      artificially narrow the uncertainty it receives. The over-coverage reflects that the
+      belief injected in the test is deliberately conservative.
+    paper_ids: [banks2020adve]
+    rubric_score: 18
+    estimates: [zopa, pareto_frontier, nash_point, joint_gains]
+    phase: both
+    inputs_required: ["own declared utility", "samples of the counterpart's θ (from other foxes or the pool)"]
+    outputs: "Distribution over the estimated ZOPA, frontier and Nash point"
+    scope_conditions: ["additive utilities", "enumerable or sampleable issue space"]
+    assumptions: ["the counterpart's utility is additive over the same issues"]
+    calibration_dataset: data/synthetic/episodes.parquet
+    validation_report: foxes/f07_zopa_pareto_estimator/validation_report.md
+    skill_path: skills/foxes/f07_zopa_pareto_estimator
+    implementation_plan: "Sample θ, build the counterpart's implied utility, enumerate or
+      sample the outcome space, compute frontier, Nash and KS per sample."
+
+  - fox_id: f08_outcome_simulator
+    name: "Outcome simulator per candidate strategy"
+    version: "0.1.0"
+    status: implemented
+    paper_ids: [hendrikx2012eval, faratin1998nego]
+    rubric_score: 17
+    estimates: [outcome_distribution, p_impasse]
+    phase: prep
+    inputs_required: ["own candidate strategy", "samples of θ", "counterpart families"]
+    outputs: "Distribution of own utility, joint utility and impasse probability per strategy"
+    scope_conditions:
+      - "alternating-offers protocol"
+      - "the simulated families (Boulware, Conceder, tit-for-tat, hardliner) cover the real counterpart"
+    assumptions: ["the counterpart belongs to one of the simulated families"]
+    calibration_dataset: data/synthetic/episodes.parquet
+    validation_report: foxes/f08_outcome_simulator/validation_report.md
+    skill_path: skills/foxes/f08_outcome_simulator
+    notes: >-
+      Stays `implemented` rather than `validated`: its output is a distribution of outcomes
+      conditional on the family assumption, and an honest validation requires contrasting it
+      against episodes where the counterpart does NOT belong to any simulated family. That
+      contrast belongs to Part 3, not Part 1.
+
+  - fox_id: f09_hypothesis_issue_weights
+    name: "Issue weights by Bayesian update over a hypothesis space"
+    version: "0.1.0"
+    status: validated
+    validation_summary: >-
+      Over 616 evaluations, all in scope: CRPS 0.097 (control 0.110) and log score 0.474
+      (control 0.427); coverage 50/90 = 0.46/0.90. It is the only weight estimator that beats
+      the control on **both** scoring rules, even against a control that is the generating
+      distribution of the true weights.
+    calibration:
+      parameter: sigma
+      value_file: skills/foxes/f09_hypothesis_issue_weights/assets/calibration.json
+      note: "Dispersion of the Luce likelihood, calibrated for nominal coverage."
+    paper_ids: [konishi2026pref, hindriks2008oppo]
+    rubric_score: 16
+    estimates: [theta.w]
+    phase: online
+    inputs_required: ["the counterpart's offers", "hypothesis space over weights (discretised simplex)"]
+    outputs: "Posterior over the weight vector (weighted hypotheses)"
+    scope_conditions:
+      - "multi-issue (≥ 2 issues)"
+      - "≥ 2 observed offers"
+      - "additive utility of the counterpart"
+    assumptions:
+      - "the counterpart proposes offers of high utility to itself under its true profile"
+      - "the hypothesis space discretises the simplex with enough resolution"
+      - "sigma (likelihood dispersion) controls the aggressiveness of the update"
+    calibration_dataset: data/synthetic/episodes.parquet
+    validation_report: foxes/f09_hypothesis_issue_weights/validation_report.md
+    skill_path: skills/foxes/f09_hypothesis_issue_weights
+    notes: >-
+      Second estimator of `w` with a mechanism independent of f02: f02 looks at *how much is
+      conceded* per issue between consecutive offers, f09 at *how likely each offer is* under
+      each weight hypothesis. Disagreement between them is informative and triggers
+      hypotheses (§6.5 rule 4).
+
+  - fox_id: f10_impasse_risk
+    name: "Impasse risk as a function of the offer's ambition"
+    version: "0.0.0"
+    status: candidate
+    paper_ids: [schweinsberg2022unde]
+    rubric_score: 12
+    estimates: [p_impasse]
+    phase: both
+    inputs_required: ["ambition of the offer as a fraction of the anchor", "history of the table"]
+    outputs: "Impasse probability with an interval"
+    scope_conditions:
+      - "the published fit is on single-issue eBay sales: out of scope for multi-issue cases
+         without recalibration"
+    assumptions:
+      - "three-zone quartic shape (safety, acceleration ~90–20 % of list price, saturation
+         below 20 % with ~95 % impasses)"
+    calibration_dataset: null
+    validation_report: null
+    skill_path: skills/foxes/f10_impasse_risk
+    blocked_by: >-
+      The published calibration dataset (26 M eBay negotiations) is not accessible and the
+      PDF has no open route; recalibrating the quartic on our synthetic dataset would change
+      the estimated object (human impasse vs impasse of simulated agents). Documented and
+      not used.

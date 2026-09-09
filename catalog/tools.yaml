@@ -1,0 +1,96 @@
+# Tool catalog (task 1.7).
+#
+# A tool is NOT a fox: it is a deterministic computation over information the party already
+# has (its own utility, the issue space, the θ samples the foxes give it). It does not estimate
+# θ, needs no calibration dataset and carries no validation report: it carries unit tests of
+# correctness.
+#
+# Statuses: `implemented` = code and test exist; `planned` = built in Part 2 (task 2.8) and
+# not yet existing. Tools that do not exist are not listed as available.
+
+version: 1
+
+tools:
+  - tool_id: t01_own_utility
+    name: "Own additive utility"
+    description: "Evaluates an offer with the utility function declared by the party."
+    inputs: [declared_utility.json, offer]
+    outputs: "utility in [0,1]"
+    implementation: "foxes/domain.py :: Utility"
+    skill_path: skills/tools/t01_own_utility
+    status: implemented
+
+  - tool_id: t02_pareto_frontier
+    name: "Pareto frontier and reference points"
+    description: "Frontier, Nash point and Kalai–Smorodinsky point given two utilities."
+    inputs: [own utility, counterpart utility (a θ sample)]
+    outputs: "set of non-dominated offers, nash_point, ks_point"
+    implementation: "foxes/domain.py :: pareto_frontier, nash_point, kalai_smorodinsky"
+    skill_path: skills/tools/t02_pareto_frontier
+    status: implemented
+
+  - tool_id: t03_zopa
+    name: "ZOPA"
+    description: "Zone of possible agreement given two utilities and two reservation values."
+    inputs: [utilities, own rv, samples of the counterpart's rv]
+    outputs: "set of mutually acceptable offers; probability of an empty ZOPA"
+    implementation: "foxes/domain.py :: zopa (probability of an empty ZOPA: f07.p_no_zopa)"
+    skill_path: skills/tools/t03_zopa
+    status: implemented
+
+  - tool_id: t04_eig
+    name: "Expected information gain of an offer"
+    description: >-
+      Expected reduction of entropy over θ from observing the response to an offer. It is the
+      exploration lever of RQ2: it turns an offer into an experiment.
+    inputs: [posterior over θ, candidate offer, acceptance model (p_accept_from_belief)]
+    outputs: "EIG in nats"
+    skill_path: skills/tools/t04_eig
+    status: implemented
+    implementation: "tools/decision.py :: expected_information_gain"
+    paper_ids: [leahu2019auto]
+
+  - tool_id: t05_evpi
+    name: "Expected value of perfect information per parameter"
+    description: "How much the best decision would improve if a parameter of θ were resolved."
+    inputs: [posterior over θ, offer space, own utility]
+    outputs: "EVPI per parameter"
+    skill_path: skills/tools/t05_evpi
+    status: implemented
+    implementation: "tools/decision.py :: evpi"
+
+  - tool_id: t06_meso_generator
+    name: "Multiple equivalent simultaneous offers (MESO) generator"
+    description: >-
+      Generates k packages of equivalent own utility and maximal dispersion in the issue
+      space, so that the counterpart's choice is informative.
+    inputs: [own utility, target utility level, k]
+    outputs: "k equivalent offers"
+    skill_path: skills/tools/t06_meso_generator
+    status: implemented
+    implementation: "tools/integrative.py :: generate_mesos"
+
+  - tool_id: t07_logrolling_finder
+    name: "Trade finder (logrolling)"
+    description: "Finds trades that raise the expected joint utility under the posterior."
+    inputs: [own utility, samples of the counterpart's weights, base offer]
+    outputs: "list of trades with expected joint gain"
+    skill_path: skills/tools/t07_logrolling_finder
+    status: implemented
+    implementation: "tools/integrative.py :: find_logrolling"
+
+  - tool_id: t08_contingent_builder
+    name: "Contingent-clause builder"
+    description: >-
+      Proposes a clause conditioned on an event about which the parties hold different
+      beliefs, so that both value it positively under their own beliefs.
+    inputs: [own belief about the event, estimated belief of the counterpart, affected issue]
+    outputs: "contingent clause with the expected value for each party"
+    skill_path: skills/tools/t08_contingent_builder
+    status: implemented
+    implementation: "tools/integrative.py :: build_contingent"
+    notes: >-
+      The corpus offers no computational treatment of contingent contracts (L2 says so
+      explicitly: mentions only). Implemented with the mutually-favourable-bet criterion,
+      priced at the midpoint of the two beliefs (DECISIONS D-029), without empirical backing:
+      it implements a criterion, it does not replicate a result.
