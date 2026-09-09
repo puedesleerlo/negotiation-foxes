@@ -1,0 +1,315 @@
+# Task 1.5 — Structured annotation per paper. Reviewable by hand.
+#
+# `evidence` distinguishes the quality of the source:
+#   paper:<paper_id>#<section>  -> read from the text extracted from the PDF (primary source)
+#   kosmos:<claim_id>           -> only from what the Kosmos report says (secondary source,
+#                                  because the PDF could not be downloaded through legitimate routes)
+# `relevance`: prep | online | both | tooling | context | out_of_scope_e1
+# `research_question`: rq1_uncertainty (measure) | rq2_exploitation (exploit) | both | none
+#
+# The `evidence` pointers are validated by kb.load_annotations against the extracted sections
+# and the claim ids: do not translate or edit them by hand.
+
+zeng1998baye:
+  models:
+    - name: "Bazaar: Bayesian learning over a hypothesis space"
+      estimates: [theta.rv]
+      phase: online
+      inputs_required: [sequence of offers and counteroffers, set of hypotheses about the RV, prior]
+      assumptions:
+        - "RV fixed within the session (implicit stationarity)"
+        - "The hypothesis set contains the true value"
+        - "A likelihood linking the observation to the hypothesis is known"
+      evaluation: "Qualitative comparison against non-learning agents; no proper scoring rules"
+      benchmark: "Single-issue buyer-supplier example"
+      code_available: no
+      data_available: no
+      complexity: low
+      relevance: online
+      research_question: rq1_uncertainty
+      notes: >-
+        The lineage of fox f01. The operational formulation (Bayes' rule over discrete
+        hypotheses of the RV, estimate as a likelihood-weighted sum) is described both in the
+        report and in sections 4.1 and 5.1.1 of Baarslag's survey.
+  evidence:
+    - "paper:baarslag2015lear#4.1 Bayesian learning"
+    - "paper:baarslag2015lear#5.1 Learning the acceptance strategy"
+    - "kosmos:edison_playground-c001"
+    - "kosmos:edison_playground-c002"
+
+faratin1998nego:
+  models:
+    - name: "Time-dependent decision functions (Boulware / Conceder)"
+      estimates: [theta.beta, theta.T]
+      phase: online
+      inputs_required: [target utility per round, normalised time, offer range]
+      assumptions:
+        - "The counterpart uses a time-dependent tactic with a known functional form"
+        - "The parameters (k, e, deadline) do not change mid-session"
+      evaluation: "Simulation between agents; no recovery of true parameters"
+      benchmark: "Bilateral service domain"
+      code_available: no
+      data_available: no
+      complexity: low
+      relevance: both
+      research_question: rq1_uncertainty
+      notes: >-
+        Canonical form used by f03 and by the counterpart generator of the synthetic dataset:
+        u(t) = Pmin + (Pmax - Pmin)(1 - F(t)) with F(t) = k + (1-k)·t^(1/e); e<1 Boulware,
+        e>=1 Conceder. The downloaded PDF has bitmap fonts and the text comes out degraded
+        (extraction_quality=low), so the formula is taken from the survey, which reproduces it.
+  evidence:
+    - "paper:baarslag2015lear#3.6 Negotiation tactics"
+    - "kosmos:edison_playground-c004"
+    - "kosmos:edison_playground-c005"
+
+baarslag2015lear:
+  models:
+    - name: "Taxonomy of opponent models (BOA) and catalog of learning methods"
+      estimates: [theta.rv, theta.w, theta.T, p_accept]
+      phase: both
+      inputs_required: [offer history, domain, own preference profile]
+      assumptions:
+        - "Linear additive utility in most weight estimators"
+        - "Known shape of the opponent's decision function in the RV/deadline estimators"
+      evaluation: >-
+        Documents that the field evaluates with point-accuracy measures (Euclidean distance on
+        weights, MSE/MAE on offer utility, Pearson correlation, percentage error of RV and
+        deadline) and performance measures (mean utility, distance to Pareto, distance to
+        Nash/KS, agreement rate). It uses neither proper scoring rules nor calibration diagnostics.
+      benchmark: "GENIUS / ANAC; no common benchmark for RV and deadline"
+      code_available: "partial (GENIUS)"
+      data_available: "partial (ANAC domains)"
+      complexity: n/a
+      relevance: both
+      research_question: rq1_uncertainty
+      notes: >-
+        Primary source of the catalog. It also provides: (a) the weight estimator by
+        normalised concession ratio w_i = 1 - c_i (Niemann and Lang; Jonker et al.; Carbonneau
+        and Vahidov), the basis of f02; (b) KDE as a technique to estimate acceptance
+        probability, the basis of f04; (c) the identifiability warning: RV and deadline are
+        structurally coupled and several methods derive one from the other instead of
+        identifying them separately.
+  evidence:
+    - "paper:baarslag2015lear#5.3 Learning the preference profile"
+    - "paper:baarslag2015lear#4.3 Kernel density estimation"
+    - "paper:baarslag2015lear#5.2 Learning the deadline"
+    - "paper:baarslag2015lear#6 Measuring the quality of an opponent model"
+    - "kosmos:edison_playground-c012"
+    - "kosmos:edison_playground-c013"
+    - "kosmos:edison_playground-c014"
+    - "kosmos:edison_playground-c030"
+
+eshragh2019mult:
+  models:
+    - name: "Unscented particle filtering over fuzzy preference models"
+      estimates: [theta.w]
+      phase: online
+      inputs_required: [per-round feedback on proposals, parametric preference model]
+      assumptions: ["The opponent's strategy does not change during the negotiation"]
+      evaluation: "Round-by-round improvement of the opponent model; no formal convergence guarantees"
+      benchmark: "Multi-criteria multi-party negotiation (thesis)"
+      code_available: no
+      data_available: no
+      complexity: medium
+      relevance: online
+      research_question: rq1_uncertainty
+      notes: >-
+        Justifies particle filters as a sequential belief representation; E1 adopts them for
+        their simplicity over variational inference (principle §3).
+  evidence: ["paper:eshragh2019mult#Abstract", "kosmos:edison_playground-c007", "kosmos:edison_playground-c008"]
+
+leahu2019auto:
+  models:
+    - name: "Stochastic utility model with Gaussian processes"
+      estimates: [theta.w, p_accept]
+      phase: both
+      inputs_required: [comparative queries or observed offers, GP prior]
+      assumptions: ["The underlying utility function is fixed; the GP models uncertainty about its shape"]
+      evaluation: "Update by Laplace approximation; no convergence conditions"
+      benchmark: "Bilateral negotiation with incomplete information"
+      code_available: no
+      data_available: no
+      complexity: high
+      relevance: prep
+      research_question: both
+      notes: >-
+        Contributes to RQ2 the value-of-information framing: eliciting preferences is an action
+        whose expected benefit must exceed its annoyance cost. It is the closest antecedent to
+        treating the offer as an experiment.
+  evidence: ["paper:leahu2019auto#Abstract", "kosmos:edison_playground-c009", "kosmos:edison_playground-c010", "kosmos:edison_playground-c026"]
+
+hendrikx2012eval:
+  models:
+    - name: "Evaluation methodology for opponent models"
+      estimates: []
+      phase: both
+      inputs_required: [agents with a fixed strategy, set of opponents, scenarios]
+      assumptions: ["To compare, the components that are not the model must be held fixed"]
+      evaluation: >-
+        Benchmark with eight opponent strategies (three cooperative high-concession ones, five
+        competitive ones including ANAC agents) and seven scenarios; four agents with
+        concession parameters e = 0.1, 0.2, 1.0, 2.0. No proper scoring rules or calibration.
+      benchmark: "GENIUS"
+      code_available: "partial (GENIUS)"
+      data_available: no
+      complexity: n/a
+      relevance: tooling
+      research_question: rq1_uncertainty
+      notes: >-
+        It is the experimental design that E1's synthetic dataset copies: vary counterpart
+        family and scenario, fix everything else. It also documents the uncomfortable finding
+        that a bad model can perform worse than not modelling.
+  evidence: ["paper:hendrikx2012eval#Abstract", "kosmos:edison_playground-c023", "kosmos:edison_playground-c032"]
+
+lin2026dist:
+  models:
+    - name: "BOND — distilling Bayesian belief states into language models"
+      estimates: [opponent type]
+      phase: online
+      inputs_required: [utterances and offers, opponent typology]
+      assumptions: ["The opponent type belongs to a known discrete set"]
+      evaluation: >-
+        Per-turn Brier on CaSiNo: Bayesian teacher 0.085 over 1054 predictions, distilled
+        student 0.114, chain-of-thought baseline 0.194. First use of a proper scoring rule on
+        beliefs about the opponent in negotiation.
+      benchmark: CaSiNo
+      code_available: "to verify"
+      data_available: "CaSiNo is public"
+      complexity: high
+      relevance: context
+      research_question: rq1_uncertainty
+      notes: >-
+        Evidence that evaluation by proper scoring rules is viable in this domain; grounds
+        E1's calibration metric (Brier per hypothesis, log score and CRPS over θ).
+  evidence: ["paper:lin2026dist#Abstract", "kosmos:edison_playground-c015", "kosmos:edison_playground-c016"]
+
+sicilia2024deal:
+  models:
+    - name: "FortUne Dial — forecasting the negotiation outcome with uncertainty"
+      estimates: [outcome distribution]
+      phase: prep
+      inputs_required: [negotiation transcripts]
+      assumptions: ["The outcome is predictable from the dialogue"]
+      evaluation: "Brier and Brier skill score with explicit calibration analysis over eight corpora"
+      benchmark: "eight negotiation corpora"
+      code_available: "to verify"
+      data_available: "yes (public corpora)"
+      complexity: high
+      relevance: context
+      research_question: rq1_uncertainty
+      notes: "Direct antecedent of E1's outcome-uncertainty metric (§15)."
+  evidence: ["paper:sicilia2024deal#Abstract", "kosmos:edison_playground-c018"]
+
+konishi2026pref:
+  models:
+    - name: "Bayesian opponent modelling over a hypothesis space (weights + evaluation functions)"
+      estimates: [theta.w]
+      phase: online
+      inputs_required: [offers per round, hypothesis space over weights and evaluation shapes]
+      assumptions:
+        - "Additive utility of the opponent"
+        - "The finite hypothesis space contains a reasonable approximation of the truth"
+      evaluation: "Overall agreement rate and preference-estimation accuracy on a multi-party benchmark"
+      benchmark: "multi-agent environment of Abdelnabi et al. 2024 (6 parties, 5 issues)"
+      code_available: "to verify"
+      data_available: "yes (public benchmark)"
+      complexity: medium
+      relevance: online
+      research_question: rq1_uncertainty
+      notes: >-
+        Basis of fox f09: the numerical part (likelihood of the offer under each weight
+        hypothesis, Bayesian update) is implementable without an LLM. The part that converts
+        qualitative signals from utterances into likelihoods requires an LLM and waits for a
+        wired benchmark; it is declared as an extension, not as part of the validated fox.
+  evidence:
+    - "paper:konishi2026pref#Abstract"
+    - "paper:konishi2026pref#3.1 Model Representation and Hypothesis"
+    - "kosmos:edison_playground-c011"
+
+yang2025unce:
+  models:
+    - name: "UAOM — opponent modelling with aleatoric/epistemic decomposition"
+      estimates: [theta (opponent policy)]
+      phase: online
+      inputs_required: [interaction trajectories]
+      assumptions: ["Training by deep RL with an ensemble"]
+      evaluation: "Comparison on multi-agent RL tasks"
+      benchmark: "RL environments"
+      code_available: "to verify"
+      data_available: no
+      complexity: high
+      relevance: context
+      research_question: rq1_uncertainty
+      notes: >-
+        The only work in the corpus that explicitly separates aleatoric uncertainty
+        (probabilistic encoder) from epistemic (model ensemble). Grounds E1 reporting the
+        pool's entropy (epistemic) separately from behavioural noise.
+        PDF not available through an open route: secondary annotation.
+  evidence: ["kosmos:edison_playground-c022"]
+
+banks2020adve:
+  models:
+    - name: "Adversarial Risk Analysis"
+      estimates: [utility, beliefs and resources of the opponent]
+      phase: prep
+      inputs_required: [subjective distributions over the opponent's attributes]
+      assumptions: ["No Nash equilibrium is assumed; uncertainty is propagated by Monte Carlo"]
+      evaluation: "Case studies"
+      benchmark: n/a
+      code_available: no
+      data_available: no
+      complexity: medium
+      relevance: prep
+      research_question: rq1_uncertainty
+      notes: >-
+        Separates aleatoric from epistemic and propagates by Monte Carlo: it is exactly the
+        pattern of f07 (sample θ, propagate to ZOPA and frontier). PDF with restricted access:
+        secondary annotation.
+  evidence: ["kosmos:edison_playground-c020", "kosmos:edison_playground-c021"]
+
+schweinsberg2022unde:
+  models:
+    - name: "Empirical utility–impasse frontier in eBay negotiations"
+      estimates: [p_impasse given the ambition level of the first offer]
+      phase: prep
+      inputs_required: [first offer as a fraction of the list price]
+      assumptions: ["Single-issue sales domain; aggregate behaviour of 26 million negotiations"]
+      evaluation: >-
+        Linear anchoring effect on the final price (R^2 = .997, slope 0.82). Non-linear
+        (quartic) impasse risk with three zones: safety, acceleration (~90%-20% of list price)
+        and saturation (<20%, ~95% impasses). Estimated optimal buyer opening ~80% of list
+        price; per-category recommendations between 33% and 95%. Local risk minima at salient
+        values (50%, 67%, 75%, 80%).
+      benchmark: "26 million buyer-seller negotiations on eBay"
+      code_available: no
+      data_available: no
+      complexity: low
+      relevance: prep
+      research_question: rq2_exploitation
+      notes: >-
+        The only quantitative characterisation of the utility–impasse frontier in the corpus
+        and the empirical basis of the impasse model E1 would use to score ambitious offers.
+        PDF without an open route: secondary annotation, figures taken from the Kosmos report.
+  evidence:
+    - "kosmos:edison_playground-c049"
+    - "kosmos:edison_playground-c055"
+
+hindriks2008oppo:
+  models:
+    - name: "Bayesian preference modelling with a dispersion parameter"
+      estimates: [theta.w]
+      phase: online
+      inputs_required: [the opponent's offers, prior over profiles]
+      assumptions: ["Additive profile; sigma controls the aggressiveness of the update"]
+      evaluation: "Model accuracy against known profiles"
+      benchmark: GENIUS
+      code_available: "partial (GENIUS)"
+      data_available: no
+      complexity: medium
+      relevance: online
+      research_question: rq1_uncertainty
+      notes: >-
+        Provides the sigma parameter (prior confidence) that E1 exposes as a hyperparameter of
+        f01 and f09. PDF without an open route: secondary annotation.
+  evidence: ["kosmos:edison_playground-c024"]
