@@ -13,6 +13,8 @@ that directory instead of creating a nested folder.
 user's directory (affects paths outside my view).
 **Revert:** `mv` the structure into a subfolder; nothing depends on the absolute path.
 
+**Superseded on 2026-09-18** by D-049: the working directory is now `~/repos-new/negotiation-foxes`.
+
 ### D-002 · 2026-09-05 · `kosmos/` → `knowledge/kosmos/`
 To match the §14 structure without duplicating. The original PDF was not modified.
 **Revert:** `mv knowledge/kosmos kosmos`.
@@ -461,3 +463,14 @@ skills, tests and documentation were rewritten; generated artifacts (validation 
 the strategies and memos the model produced under the Spanish-era prompts in `runs/` are kept as
 recorded data (they are what the programs actually ran on), and `hypotheses.thresholds` still
 understands Spanish phrasings so those recorded hypotheses remain scorable.
+
+### D-049 · 2026-09-18 · The project's name is `negotiation-foxes`, everywhere
+`comparator` was the pre-existing directory name (D-001), never the project's. The published
+repository, `pyproject.toml` and the README title already read `negotiation-foxes`; the working
+directory now matches, so a single name identifies the project in the shell, in the package
+metadata and on GitHub.
+**Discarded:** renaming the repository to `foxes-at-the-table` or `zopa` — the first is more
+evocative but the public URL is already in use, the second drops the fox framing the whole
+README is built on.
+**Revert:** `mv ~/repos-new/negotiation-foxes ~/repos-new/comparator`; nothing in the code reads
+the absolute path, and the git remote is unaffected.
