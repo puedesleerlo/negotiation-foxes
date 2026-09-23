@@ -8,8 +8,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Program on Negotiation material and everything derived from it (README, "Rights")
-cases/
+# Program on Negotiation material and everything derived from it (README, "Rights").
+# The synthetic case is original and redistributable, so it is the one exception.
+cases/*
+!cases/synthetic_press/
 runs/
 
 # regenerable knowledge-base artefacts: downloaded papers, extracted text, cache, built database

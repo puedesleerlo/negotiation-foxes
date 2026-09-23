@@ -1,0 +1,79 @@
+# Two-sided synthetic case for E1 — the sale of a used printing press.
+#
+# Written for this repository and redistributable: it exists so a public checkout can run a
+# complete program (preparation, negotiation, feedback, replay) without the licensed
+# Parker-Gibson case. The parties, numbers and text are invented. It has the same shape as
+# Parker-Gibson on purpose — one continuous issue, explicit reservation values on both sides —
+# so every code path the reference case exercises runs here too.
+
+case_id: synthetic_press
+title: "Synthetic press — sale of a used offset press between two print shops"
+source: "Synthetic, written for negotiation-foxes (no third-party material)"
+
+protocol:
+  type: alternating_offers
+  max_rounds: 20
+  first_mover: random
+  allow_free_text: true
+  allow_multiple_offers: false # a single issue: a MESO is undefined
+  time_pressure: none
+
+issues:
+  - id: price
+    type: continuous
+    range: [5000, 50000]
+    step: 500
+    unit: USD
+    description: "Price of the used two-color offset press, cash, buyer collects"
+
+public_corpus: public/
+
+roles:
+  - id: harbor
+    side: seller
+    corpus: roles/harbor/
+    description: "Harbor Print, the shop selling the press"
+  - id: linden
+    side: buyer
+    corpus: roles/linden/
+    description: "Linden Books, a small publisher that wants to print in house"
+
+# ---------------------------------------------------------------------------------------------
+# Sealed truth. Both confidential corpora state their limit explicitly, so nothing is declared.
+# The gym freezes this block before the first round and only the feedback module reads it.
+sealed_truth:
+  policy_applied: explicit
+  harbor:
+    reservation_value:
+      value: 18000
+      unit: USD
+      source: explicit
+      evidence: >-
+        "Treat $18,000 as your absolute minimum."
+      batna: "Sell the press to a used-equipment dealer for 18,000 USD."
+    utility:
+      form: linear
+      direction: increasing         # more price, better for the seller
+      reservation_value_utility: 0.2889   # (18000 − 5000) / (50000 − 5000)
+  linden:
+    reservation_value:
+      value: 31000
+      unit: USD
+      source: explicit
+      evidence: >-
+        "The board has approved a firm maximum of $31,000 for a used press."
+      batna: "Keep outsourcing the print runs at a higher cost per copy."
+    utility:
+      form: linear
+      direction: decreasing         # less price, better for the buyer
+      reservation_value_utility: 0.4222   # (50000 − 31000) / (50000 − 5000)
+
+# Derived from the sealed truth (computed by the feedback; noted here for reference):
+#   true ZOPA: [18,000, 31,000] USD, 13,000 wide
+
+theta:
+  estimable: [rv, beta, T]
+  not_applicable: [w]           # a single issue: no issue weights
+  applicable_foxes: [f01_bayes_rv_concession, f03_time_concession_regression,
+                     f06_uninformed_prior, f07_zopa_pareto_estimator]
+  out_of_scope_foxes: [f02_concession_issue_weights, f09_hypothesis_issue_weights]

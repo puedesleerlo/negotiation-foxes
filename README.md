@@ -1,14 +1,77 @@
-# negotiation-foxes — E1: bilateral negotiation with foxes
+# Evaluating probabilistic beliefs in negotiation agents
 
-A negotiation system between two LLM agents with private information, where every estimate
-about the counterpart comes from **foxes**: microtheories calibrated on an explicit dataset that
-return distributions, declare their scope and cite the papers they are grounded in.
+A research prototype that estimates an opponent's hidden preferences, updates beliefs during
+negotiation, and evaluates those estimates against known synthetic ground truth. It separates
+probabilistic estimation, deterministic decisions, and LLM-generated communication.
 
-Status: **Part 1 complete**; **Parts 2 and 3 running end to end** on the real Parker-Gibson case
-with Kimi K3 writing the strategies and the prose, and a deterministic core making the decisions.
-The plan is in [PLAN.md](PLAN.md); every design decision is in [DECISIONS.md](DECISIONS.md); the
-architecture review against the original intent, with what was fixed and what remains, is in
-[REVIEW.md](REVIEW.md).
+## At a glance
+
+![Log score and CRPS of the pooled belief about the counterpart's reservation value vs. the flat-prior control, by number of observed offers](docs/img/pool_vs_control.png)
+
+**Does the belief beat a flat prior?** Partly, and the numbers say where. The estimand is the
+counterpart's reservation value; the baseline is the uninformed control `f06`. Everything is
+scored against the sealed truth on the **validation split** of the synthetic dataset (disjoint
+from calibration by a hash of the episode id): 400 episodes sampled with seed 0, each scored
+after 2, 4, 8 and all observed offers, in the oracle condition (the foxes see the true utility
+each offer gives the counterpart).
+
+| Belief about the reserve | Evaluations | Log score ↑ | CRPS ↓ | 90 % coverage |
+|---|---:|---:|---:|---:|
+| Control `f06` (flat prior) | 1,247 | −0.013 | **0.123** | 1.00 |
+| Pooled foxes `f01` + `f03`, as the gym pools them | 1,247 | **0.028** | 0.126 | 0.99 |
+| `f01` alone, in scope ([validation report](foxes/f01_bayes_rv_concession/validation_report.md)) | 934 of 1,552 | **0.128** | 0.122 | 0.93 |
+
+The pool beats the control on log score and loses on CRPS. The gain comes from conceding and
+tit-for-tat counterparts (log score 0.47 and 0.12, against about −0.01 for the control); against
+Boulware and hardliner counterparts the pool scores *worse* than the flat prior (−0.11, −0.36),
+and with only two offers observed it is worse on both rules. The counterparts follow the family
+`f03` fits, so these numbers are in-family and optimistic (REVIEW F11). The first two rows come
+from `scripts/score_vs_control.py`, which reruns the foxes on the same evaluations and redraws the
+figure (about a minute); the third is from `f01`'s committed validation report, whose control
+scores over all 1,552 evaluations are the same −0.013 / 0.123.
+
+**My contribution.** Sole author: the architecture, the fox catalog with its calibration and
+validation, the gym, the feedback and this write-up.
+
+**Status.**
+- *Works:* 10 foxes cataloged, 6 of them `validated` on disjoint splits (the control included); complete
+  programs (isolated preparation → sealed truth → negotiation → feedback → deterministic replay)
+  on the licensed Parker-Gibson case with Kimi K3 writing strategy and prose, and on a
+  redistributable synthetic case with no model at all. 117 tests.
+- *In progress:* multi-issue counterpart utility (REVIEW F4), so the weight foxes reach a
+  program; `f05` and `f10` are still candidates; `f03` is validated in-family only (F11); token
+  budgets are declared, not enforced (F10).
+
+The plan is in [PLAN.md](PLAN.md), every design decision in [DECISIONS.md](DECISIONS.md), and the
+architecture review, with what was fixed and what remains, in [REVIEW.md](REVIEW.md).
+
+## Quick start
+
+Runs on the public checkout: the synthetic case `cases/synthetic_press/` is original and
+redistributable, and nothing below needs the licensed case or an API key. Requires
+[uv](https://docs.astral.sh/uv/) and Python 3.11 or 3.12.
+
+```bash
+uv sync --extra dev                                                  # creates .venv
+PYTHONPATH=. uv run python -m gym.run --case synthetic_press --seed 7
+P=$(basename "$(ls -td runs/synthetic_press-* | head -1)")          # the program id just printed
+PYTHONPATH=. uv run python -m feedback.report --program "$P"        # -> runs/$P/feedback/report.md
+PYTHONPATH=. uv run python -m gym.replay --program "$P" --rebuild-db
+PYTHONPATH=. uv run python -m pytest                                 # tests that need the licensed case skip
+```
+
+The program ends in an agreement at 24,500 inside the true ZOPA [18,000, 31,000]; the debrief
+scores each side's belief against the control, attributes it fox by fox (`f01` again contributes
+negatively), and reports 0 model tokens and 0 canary leaks. The replay reproduces every decision
+from the trace. The model is optional: `--with-llm` and `--llm-preparation` need the credentials
+described under [The model](#the-model-kimi-k3); without them the deterministic memo is used.
+
+The belief chain on one synthetic episode, and the headline comparison above:
+
+```bash
+PYTHONPATH=. uv run python scripts/demo_belief.py --family conceder --domain d2_case3
+PYTHONPATH=. uv run --with matplotlib python scripts/score_vs_control.py --plot docs/img/pool_vs_control.png
+```
 
 ## The architecture: why foxes
 
@@ -239,6 +302,7 @@ SQLite database → verified annotation → synthetic dataset → calibration �
 | `skills/foxes/<fox_id>/` | Usage instructions per fox: when to use it, when not, how to read it |
 | `foxes/` | Runtime: common interface, registry, pooling, domain, calibration, validation |
 | `data/synthetic/` | 6,000 episodes with known θ ([column dictionary](data/synthetic/COLUMNS.md)) |
+| `cases/synthetic_press/` | Synthetic two-sided case, original and redistributable: runs the whole program without licensed material |
 | `cases/parker_gibson/` | Real two-sided case (PON/Harvard) with explicit sealed truth on both sides. **Not in this repository** (see Rights) |
 | `gym/` | Case with isolation, protocol, trace, program execution, replay and batches |
 | `agents/` | Declared utility, personality `econ`, planner, researchers, deterministic negotiator, LLM writer, model client |
@@ -319,9 +383,9 @@ online foxes, and planner validation with a fake client.
 
 ## Rights
 
-The Parker-Gibson case is Program on Negotiation material and is not redistributed: the whole
-`cases/` directory and `runs/` (every recorded program derives from the case) stay out of this
-repository. The tests that load the case are skipped, not failed, when it is absent
+The Parker-Gibson case is Program on Negotiation material and is not redistributed: `cases/`
+stays out of this repository except for `cases/synthetic_press/`, which was written for it, and
+`runs/` (every recorded program derives from a case) stays out entirely. The tests that load the case are skipped, not failed, when it is absent
 (`tests/conftest.py`). The downloaded papers, their extracted text, `knowledge/db/papers.sqlite`
 and the metadata cache are regenerable with `scripts/run_part1.sh` and are not committed either.
 Credentials live only in `.env`.
